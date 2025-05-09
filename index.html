@@ -1,0 +1,125 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dexter: Last Escape</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: black;
+  }
+  canvas {
+    display: block;
+    margin: auto;
+    background: #111;
+    border: 2px solid red;
+  }
+  #overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    color: red;
+    font-size: 48px;
+    font-family: 'Courier New', Courier, monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    flex-direction: column;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="600" height="400"></canvas>
+<div id="overlay"></div>
+<audio id="bgMusic" src="bgmusic.mp3" loop autoplay></audio>
+<audio id="deathSound" src="deathsound.mp3"></audio>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const bgMusic = document.getElementById('bgMusic');
+const deathSound = document.getElementById('deathSound');
+
+let player = { x: 280, y: 180, size: 20, color: 'white' };
+let enemy = { x: -100, y: -100, size: 30, color: 'red', active: false };
+let keys = {};
+let timer = 60;
+let death = false;
+
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
+
+function movePlayer() {
+  if (keys['ArrowUp']) player.y -= 2;
+  if (keys['ArrowDown']) player.y += 2;
+  if (keys['ArrowLeft']) player.x -= 2;
+  if (keys['ArrowRight']) player.x += 2;
+  player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
+  player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
+}
+
+function drawPlayer() {
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.size, player.size);
+}
+
+function drawEnemy() {
+  if (enemy.active) {
+    ctx.fillStyle = enemy.color;
+    ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
+  }
+}
+
+function updateEnemy() {
+  if (enemy.active) {
+    if (enemy.x < player.x) enemy.x += 1.5;
+    if (enemy.x > player.x) enemy.x -= 1.5;
+    if (enemy.y < player.y) enemy.y += 1.5;
+    if (enemy.y > player.y) enemy.y -= 1.5;
+    if (Math.abs(player.x - enemy.x) < 20 && Math.abs(player.y - enemy.y) < 20) {
+      endGame();
+    }
+  }
+}
+
+function endGame() {
+  death = true;
+  overlay.style.display = 'flex';
+  overlay.innerHTML = 'YOU DIED<br>🔪';
+  bgMusic.pause();
+  deathSound.play();
+}
+
+function gameLoop() {
+  if (death) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  movePlayer();
+  drawPlayer();
+  drawEnemy();
+  updateEnemy();
+  requestAnimationFrame(gameLoop);
+}
+
+function countdown() {
+  if (death) return;
+  timer--;
+  if (timer === 30) {
+    enemy.active = true;
+  }
+  if (timer <= 0) {
+    endGame();
+  }
+}
+
+setInterval(countdown, 1000);
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
