@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dexter: Last Escape</title>
+<style>
+  body { margin: 0; overflow: hidden; background: black; }
+  canvas { display: block; margin: auto; background: #111; }
+  #overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    color: red;
+    font-size: 48px;
+    font-family: 'Courier New', Courier, monospace;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.8);
+    flex-direction: column;
+    z-index: 2;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="overlay"></div>
+
+<script>
+// Setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+let player = { x: 400, y: 550, size: 20, color: 'white', speed: 3 };
+let dexter = { x: 100, y: 100, size: 30, color: 'red', speed: 1, chasing: false };
+let keys = {};
+let tasksCompleted = 0;
+let inTask = false;
+let escapeCage = false;
+let currentTask = null;
+let taskTimer = 0;
+let dexterRelease = false;
+let dexterSpeedTimer = 0;
+
+// Cage limits
+let cage = { x: 300, y: 500, width: 200, height: 100 };
+
+// Wall Task Zones
+const tasks = [
+  { x: 50, y: 50, w: 100, h: 20, type: 'vent' },
+  { x: 650, y: 50, w: 100, h: 20, type: 'wrap' },
+  { x: 50, y: 500, w: 100, h: 20, type: 'water' }
+];
+
+// Controls
+document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+function movePlayer() {
+  if (inTask) return;
+  if (keys['w'] || keys['arrowup']) player.y -= player.speed;
+  if (keys['s'] || keys['arrowdown']) player.y += player.speed;
+  if (keys['a'] || keys['arrowleft']) player.x -= player.speed;
+  if (keys['d'] || keys['arrowright']) player.x += player.speed;
+
+  // Stay in bounds
+  player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
+  player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
+
+  // Cage Blocking
+  if (!escapeCage) {
+    if (player.x < cage.x) player.x = cage.x;
+    if (player.x + player.size > cage.x + cage.width) player.x = cage.x + cage.width - player.size;
+    if (player.y < cage.y) player.y = cage.y;
+    if (player.y + player.size > cage.y + cage.height) player.y = cage.y + cage.height - player.size;
+  }
+}
+
+function checkTasks() {
+  if (inTask || !escapeCage) return;
+
+  for (let task of tasks) {
+    if (player.x < task.x + task.w && player.x + player.size > task.x &&
+        player.y < task.y + task.h && player.y + player.size > task.y) {
+      triggerTask(task.type);
+    }
+  }
+}
+
+function triggerTask(type) {
+  inTask = true;
+  currentTask = type;
+  if (type === 'vent') {
+    let input = prompt('Type 142 to unlock the vent:');
+    if (input === '142') {
+      alert('Vent unlocked!');
+      tasksCompleted++;
+    } else {
+      alert('Wrong code!');
+    }
+  } else if (type === 'wrap') {
+    let presses = 0;
+    alert('Spam SPACEBAR to break free!');
+    document.addEventListener('keydown', function spamSpace(e) {
+      if (e.code === 'Space') presses++;
+      if (presses > 10) {
+        alert('You broke free!');
+        tasksCompleted++;
+        document.removeEventListener('keydown', spamSpace);
+      }
+    });
+  } else if (type === 'water') {
+    let phrase = prompt('Type "holy shit" to drink water:');
+    if (phrase === 'holy shit') {
+      alert('You feel better.');
+      tasksCompleted++;
+    } else {
+      alert('You failed.');
+    }
+  }
+  inTask = false;
+}
+
+function updateDexter() {
+  if (dexterRelease) {
+    // Move Dexter toward player
+    if (player.x < dexter.x) dexter.x -= dexter.speed;
+    if (player.x > dexter.x) dexter.x += dexter.speed;
+    if (player.y < dexter.y) dexter.y -= dexter.speed;
+    if (player.y > dexter.y) dexter.y += dexter.speed;
+
+    dexterSpeedTimer++;
+    if (dexterSpeedTimer % 100 == 0) {
+      dexter.speed += 0.5; // Dexter speeds up over time
+    }
+
+    if (Math.abs(player.x - dexter.x) < 20 && Math.abs(player.y - dexter.y) < 20) {
+      gameOver();
+    }
+  }
+}
+
+function gameOver() {
+  overlay.style.display = 'flex';
+  overlay.innerHTML = 'YOU DIED 🔪';
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw background
+  ctx.fillStyle = '#222';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw walls (task zones)
+  ctx.fillStyle = '#555';
+  for (let task of tasks) {
+    ctx.fillRect(task.x, task.y, task.w, task.h);
+  }
+
+  // Draw cage
+  if (!escapeCage) {
+    ctx.strokeStyle = 'red';
+    ctx.strokeRect(cage.x, cage.y, cage.width, cage.height);
+  }
+
+  // Draw player
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.size, player.size);
+
+  // Draw Dexter
+  if (dexterRelease) {
+    ctx.fillStyle = 'rgba(255,0,0,0.5)';
+    ctx.fillRect(dexter.x, dexter.y, dexter.size, dexter.size);
+  }
+
+  movePlayer();
+  checkTasks();
+  updateDexter();
+
+  // Escape cage
+  if (!escapeCage) {
+    if (keys['arrowup'] && keys['arrowdown'] && keys['arrowleft'] && keys['arrowright']) {
+      escapeCage = true;
+      alert('You escaped the cage!');
+    }
+  }
+
+  if (tasksCompleted >= 3 && !dexterRelease) {
+    dexterRelease = true;
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
